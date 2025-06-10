@@ -1,12 +1,25 @@
-// Use: gcc -m32 -fno-stack-protector -z execstack -no-pie vuln.c -o vuln
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+void actual() {
+    printf("\nIntended function called. No control flow hijacking.\n\n");
+}
+
+void hacked() {
+    printf("Control flow hijacked! You got shell access.\n");
+    system("/bin/sh");
+}
 
 void vuln() {
-    char a[32];
-    printf("Enter input: ");
-    gets(a);
-    printf("You entered: %s\n", a);
+    char buffer[32];
+    void (*func_ptr)() = actual;
+
+    printf("Enter input:");
+    fgets(buffer, 128, stdin);
+
+    printf("You entered: %s", buffer);
+    func_ptr();
 }
 
 int main() {
