@@ -20,15 +20,26 @@ void hacked() {
         printf("Shell: exited: ret:%d\n", ret);
 }
 
-void vuln() {
+struct myframe {
     char buffer[32];
-    void (*func_ptr)() = actual;
+    void (*func_ptr)();
+};
+
+void vuln() {
+    struct myframe f;
+    f.func_ptr = actual;
+
+    printf("Address of fncptr:%p\n", &f.func_ptr);
+    printf("Address of buffer:%p\n", &f.buffer);
+    printf("Address of actual():%p\n", &actual);
+    printf("Address of hacked():%p\n", &hacked);
 
     printf("Enter input:");
-    fgets(buffer, 128, stdin);
+    fgets(f.buffer, 128, stdin);
+    //solution: fgets(f.buffer, sizeof(f.buffer), stdin);
 
-    printf("You entered: %s\n", buffer);
-    func_ptr();
+    printf("You entered: %s\n", f.buffer);
+    f.func_ptr();
 }
 
 int main() {
