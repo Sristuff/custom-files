@@ -1,0 +1,14 @@
+This lab teaches bypassing stack canaries and ASLR using format string + buffer overflow.
+
+## Phase 1: Analyze Code
+- Format string bug (`printf(buf)`)
+- Over-read via `fgets(buf, 192, stdin)`
+
+## Phase 2: Exploit
+- Leak canary and return address
+- Build payload: overwrite buffer, insert correct canary, jump to `hacked()`
+
+## Phase 3: Defend
+- Use `printf("%s", buf)` instead of `printf(buf)`
+- Limit input size
+- Use compiler hardening: PIE, RELRO, stack-protector-strong, etc.
