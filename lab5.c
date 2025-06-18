@@ -82,6 +82,21 @@ void hidden_logic(int argc, char *argv[]) {
             printf("Total CWE triggers hit:%f\n", cwe_counter);
             printf("Reading input:%s\n", argv[1]);
             printf("Reading one byte beyond the input:[%c,%c,%c,%c]\n", argv[1][0], argv[1][1], argv[1][2], argv[1][3]);
+        } else if (n == 787) {
+            printf("Trigger:Out-of-bounds write triggered!\n");
+            cwe_counter += 2;
+            printf("Total CWE triggers hit:%f\n", cwe_counter);
+            printf("Reading input:%s\n", argv[1]);
+            printf("Writing one byte beyond input:\n");
+            argv[1][3] = 'a';
+            printf("Reading one byte beyond the input:[%c,%c,%c,%c]\n", argv[1][0], argv[1][1], argv[1][2], argv[1][3]);
+        } else if (n == 190) {
+            printf("Trigger:Integer overflow triggered!\n");
+            cwe_counter += 2;
+            size_t n = SIZE_MAX;
+            printf("Assigning SIZE_MAX to n:%lu\n", n);
+            n++;
+            printf("Value of n after n++ is:%lu\n", n);
         }
         return;
     }
