@@ -21,11 +21,11 @@ void build_str(char *dest, const char *src, size_t len) {
 }
 
 int is_usual_pass(const char *s) {
-    return strstr(s, "cisco") || 
-           strstr(s, "cisco123") || 
-           strstr(s, "lab") || 
-           strstr(s, "lab123");
-           strstr(s, "C!sco123");
+    return strstr(s, "test") || 
+           strstr(s, "*") || 
+           strstr(s, "pass123") || 
+           strstr(s, "123") ||
+           strstr(s, "password");
 }
 
 int is_suspicious(const char *s) {
