@@ -4,6 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <errno.h>
+#include <limits.h>
 
 #define MAX_ALLOC 1024
 #define MAX_INPUTS 10
@@ -20,21 +22,10 @@ void build_str(char *dest, const char *src, size_t len) {
     dest[len] = '\0';
 }
 
-int is_usual_pass(const char *s) {
-    return strstr(s, "test") || 
-           strstr(s, "*") || 
-           strstr(s, "pass123") || 
-           strstr(s, "123") ||
-           strstr(s, "password");
-}
-
-int is_suspicious(const char *s) {
-    return strstr(s, "crash") ||
-           strstr(s, "CWE") ||
-           strstr(s, "die") ||
-           strstr(s, "DEADBEEF") ||
-           strstr(s, "fail");
-}
+const char *top6[] = {"123456", "123456789", "12345678","password","qwerty"};
+const char *usual[] = {"cisco123", "test123", "lab123", "cisco","C!sco123"};
+const char *cheeky[] = {"crash", "die", "DEADBEEF", "fail", "segfault", "core"};
+const char *good[] = {"CWE", "cwe", "CVE", "cve"};
 
 void hidden_logic(int argc, char *argv[]) {
     char at_sym[2], magic_val[5];
@@ -46,19 +37,55 @@ void hidden_logic(int argc, char *argv[]) {
         return;
     }
 
-    for (int i = 1; i < argc; i++) {
-        if (is_suspicious(argv[i])) {
-            printf("Trying '%s'? Sneaky move!\n", argv[i]);
-        }
+    if (argc > 2) {
+        printf("Too many arguments.\n");
+        return;
+    }
 
-        if (is_usual_pass(argv[i])) {
-            printf("Trying company defaults? Good try!\n");
-            cwe_counter += .2;
+    for (int i = 0; i < 6; i++) {
+        if (strncmp(argv[1], cheeky[i], strlen(cheeky[i])) == 0) {
+            printf("Trying clever ones? Good try, but no triggers here!\n");
+            cwe_counter += .1;
+            return;
         }
     }
 
+    for (int i = 0; i < 5; i++) {
+        if (strncmp(argv[1], top6[i], strlen(top6[i])) == 0) {
+            printf("Trying Top 6 passwords? Good try, but no triggers here!\n");
+            cwe_counter += .1;
+            return;
+        }
+    }
+
+    for (int i = 0; i < 5; i++) {
+        if (strncmp(argv[1], usual[i], strlen(usual[i])) == 0) {
+            printf("Trying company defaults? Good try, but no triggers here!\n");
+            cwe_counter += .2;
+            return;
+        }
+    }
+    
+    for (int i = 0; i < 4; i++) {
+        if (strncmp(argv[1], good[i], strlen(good[i])) == 0) {
+            printf("Close....no triggers here, but try again!\n");
+            cwe_counter += .3;
+            return;
+        }
+    }
+    
     if (argc == 2) {
-        int n = strtoul(argv[1], NULL, 0);
+        char *endptr = NULL;
+        size_t n = strtoul(argv[1], &endptr, 0);
+        if (errno == ERANGE) {
+            printf("Interesting range input, but no triggers here!\n");
+            cwe_counter += .2;
+            return;
+        } else if (*endptr != '\0') {
+            printf("No triggers hit. Please try again. Current CWE score:%f\n", cwe_counter);
+            return;
+        }
+
         if (n == 476) {
             printf("Trigger:NULL pointer dereference triggered!\n");
             cwe_counter += 3;
@@ -97,59 +124,58 @@ void hidden_logic(int argc, char *argv[]) {
             printf("Assigning SIZE_MAX to n:%lu\n", n);
             n++;
             printf("Value of n after n++ is:%lu\n", n);
-        }
-        return;
-    }
-
-    if (argc == 3) {
-        size_t n = strtoul(argv[2], NULL, 0);
-        if (n == SIZE_MAX) {
+        } else if (n == SIZE_MAX) {
             size_t size = n * sizeof(int);
             if (n > 0 && size / n != sizeof(int)) {
                 printf("Trigger:Integer overflow in malloc!\n");
                 cwe_counter++;
                 return;
             }
+        } else if ((n == INT_MIN) || (n == CHAR_MIN) || (n == LONG_MIN) || (n == SHRT_MIN) || (n == LLONG_MIN)) {
+            printf("Interesting input with MIN values, but no triggers here!\n");
+            cwe_counter += .2;
+            return;
+        } else if ((n == INT_MAX) || (n == CHAR_MAX) || (n == LONG_MAX) || (n == SHRT_MAX) || (n == LLONG_MAX) || (n == USHRT_MAX) || (n == UCHAR_MAX)) {
+            printf("Interesting input with MAX values, but no triggers here!\n");
+            cwe_counter += .2;
+            return;
+        } else if ((n == 0) || (n == 1)) {
+            printf("Interesting input, but no triggers here!\n");
+            cwe_counter += .1;
+            return;
+        } else {
+            printf("No triggers hit. Please try again. Current CWE score:%f\n", cwe_counter);
+            return;
         }
     }
-
-    if (argc > 6 && strcmp(argv[6], "UNINIT") == 0) {
-        int x;
-        printf("🎲 Using uninitialized value: %d\n", x);
-        cwe_counter++;
-    }
-
-    if (argc > 7 && strlen(argv[7]) > 10) {
-        char buf[10];
-        strcpy(buf, argv[7]);
-        printf("🔥 Buffer overflow with strcpy!\n");
-        cwe_counter++;
-    }
- 
-    printf("No triggers hit. Please try again\n");
 }
 
 int main() {
     srand((unsigned)time(NULL));
-    printf("Welcome to the Interactive CWE Black-box Lab (type `exit` to quit)\n");
+    printf("______________________________________________________________\n");
+    printf("Welcome to the Interactive Black-box Lab (type `exit` to quit)\n");
+    printf("______________________________________________________________\n");
 
     char input[MAX_INPUTS][MAX_LEN];
     char *argv[MAX_INPUTS + 1];
     int argc;
 
     while (1) {
-        printf("\n> Enter space-separated arguments (or type `exit` to finish):\n> ");
+        printf("\n> Put on your thinking hat! Try different inputs (or type `exit` to finish):\n> ");
         char line[MAX_LEN * MAX_INPUTS] = {0};
         if (!fgets(line, sizeof(line), stdin)) break;
 
         if (strncmp(line, "help", 4) == 0) {
-            printf("First paramater value can crash the program.\n");
-            printf("Second parameter value relates to memory allocation");
+            printf("______________________________________________________________\n");
+            printf("Try various alphanumeric inputs to trigger a CWE and get points");
+            printf("______________________________________________________________\n");
             continue;
         }
 
         if (strncmp(line, "exit", 4) == 0) {
-            printf("Lab complete. Total CWE triggers hit: %f\n", cwe_counter);
+            printf("________________________________________\n");
+            printf("Lab complete. Total CWE score: %f\n", cwe_counter);
+            printf("________________________________________\n");
             break;
         }
 
