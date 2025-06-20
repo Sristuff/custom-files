@@ -38,7 +38,7 @@ void handle_client(int client_fd) {
     struct frame f;
     f.func_ptr = safe;
 
-    write(client_fd, "Hint:string:CONTROL FLOW HIJACKED\n Enter your data: ", 46);
+    write(client_fd, "Hint:string:CONTROL FLOW HIJACKED\n Enter data:", 47);
     read(client_fd, f.buffer, 128);  // CWE-787
 
     dup2(client_fd, STDOUT_FILENO);

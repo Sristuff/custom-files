@@ -7,18 +7,19 @@
 #include <time.h>
 #include <sys/socket.h>
 
+#define BUF_SIZE 40
+
 struct frame {
     char buffer[32];
     void (*func_ptr)();
 };
 
-void safe() {
-    printf("Connected, but no control flow change. Please try again.\n");
+void safe(int client_fd) {
+    const char *msg = "Connected. Safe function. Please try again\n";
+    write (client_fd, msg, strlen(msg));
 }
 
-void hacked() {
-    printf("[!] CONTROL FLOW HIJACKED\n");
-    printf("[*] PID: %d, PPID: %d\n", getpid(), getppid());
+void hacked(int client_fd) {
 
     char obfuscated[] = { 'W' ^ 0x23, 'a' ^ 0x23, 'i' ^ 0x23, 't' ^ 0x23, 'i' ^ 0x23, 'n' ^ 0x23, 'g' ^ 0x23,
                           ' ' ^ 0x23, 'f' ^ 0x23, 'o' ^ 0x23, 'r' ^ 0x23, ' ' ^ 0x23, 'o' ^ 0x23, 'u' ^ 0x23,
@@ -31,24 +32,33 @@ void hacked() {
         obfuscated[i] ^= 0x23;
     }
 
-    printf("[*] FLAG: %s\n", obfuscated);
+    write(client_fd, obfuscated, strlen(obfuscated));
+
+    //printf("[*] FLAG: %s\n", obfuscated);
 }
 
 void handle_client(int client_fd) {
+    char buffer[BUF_SIZE];
+
     struct frame f;
     f.func_ptr = safe;
 
-    write(client_fd, "Hint:fn:hacked\n Enter your data: ", 46);
+    write(client_fd, "Hint:fn:hacked\n Enter your data: ", 34);
     read(client_fd, f.buffer, 128);  // CWE-787
+
+    f.func_ptr(client_fd);
 
     dup2(client_fd, STDOUT_FILENO);
     dup2(client_fd, STDERR_FILENO);
     close(client_fd);
 
-    f.func_ptr();
+   // f.func_ptr();
 }
 
 int main() {
+    int server_fd, client_fd;
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
     srand(time(NULL));
     int port = (rand() % (65535 - 1024)) + 1024;
 
