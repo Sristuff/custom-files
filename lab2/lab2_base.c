@@ -3,23 +3,16 @@
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <time.h>
-#include <sys/socket.h>
 
 #define BUF_SIZE 40
 
-struct frame {
-    char buffer[32];
-    void (*func_ptr)();
-};
-
-void safe(int client_fd) {
-    const char *msg = "Connected. Safe function. Please try again\n";
-    write (client_fd, msg, strlen(msg));
-}
+typedef void (*func_ptr_t)(int);
 
 void hacked(int client_fd) {
+    char msg[128];
+    snprintf(msg, sizeof(msg), "[!] CONTROL FLOW HIJACKED\n[*] PID: %d, PPID: %d\n", getpid(), getppid());
+    write(client_fd, msg, strlen(msg));
 
     char obfuscated[] = { 'W' ^ 0x23, 'a' ^ 0x23, 'i' ^ 0x23, 't' ^ 0x23, 'i' ^ 0x23, 'n' ^ 0x23, 'g' ^ 0x23,
                           ' ' ^ 0x23, 'f' ^ 0x23, 'o' ^ 0x23, 'r' ^ 0x23, ' ' ^ 0x23, 'o' ^ 0x23, 'u' ^ 0x23,
@@ -32,56 +25,68 @@ void hacked(int client_fd) {
         obfuscated[i] ^= 0x23;
     }
 
-    write(client_fd, obfuscated, strlen(obfuscated));
+    snprintf(msg, sizeof(msg), "[*] FLAG: %s\n", obfuscated);
+    write(client_fd, msg, strlen(msg));
+}
 
-    //printf("[*] FLAG: %s\n", obfuscated);
+void safe(int client_fd) {
+    const char *msg = "[*] You reached the safe function.\n";
+    write(client_fd, msg, strlen(msg));
 }
 
 void handle_client(int client_fd) {
     char buffer[BUF_SIZE];
+    func_ptr_t func_ptr = safe;
 
-    struct frame f;
-    f.func_ptr = safe;
+    const char *prompt = "Hint:fn:hacked\n Enter your data: ";
+    write(client_fd, prompt, strlen(prompt));
 
-    write(client_fd, "Hint:fn:hacked\n Enter your data: ", 34);
-    read(client_fd, f.buffer, 128);  // CWE-787
+    ssize_t len = read(client_fd, buffer, sizeof(buffer));
+    if (len < 0) {
+        perror("read");
+        return;
+    }
 
-    f.func_ptr(client_fd);
-
-    dup2(client_fd, STDOUT_FILENO);
-    dup2(client_fd, STDERR_FILENO);
-    close(client_fd);
-
-   // f.func_ptr();
+    buffer[len] = '\0';  // Null terminate to avoid overflow when printed
+    func_ptr(client_fd);
 }
 
 int main() {
     int server_fd, client_fd;
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
+
     srand(time(NULL));
-    int port = (rand() % (65535 - 1024)) + 1024;
+    int port = 1024 + rand() % (65535 - 1024);
 
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_addr.s_addr = INADDR_ANY,
-        .sin_port = htons(port)
-    };
-
-    bind(server_fd, (struct sockaddr *)&addr, sizeof(addr));
-    listen(server_fd, 1);
-
-    printf("Mini-CTF server listening...\n");
-    fflush(stdout);
-
-    while (1) {
-        int client_fd = accept(server_fd, NULL, NULL);
-        if (client_fd >= 0) {
-            handle_client(client_fd);
-        }
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(EXIT_FAILURE);
     }
 
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+
+    if (bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(server_fd, 1) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Mini-CTF server listening...\n");
+
+    if ((client_fd = accept(server_fd, (struct sockaddr *)&addr, &addrlen)) < 0) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+
+    handle_client(client_fd);
+    close(client_fd);
     close(server_fd);
     return 0;
 }
